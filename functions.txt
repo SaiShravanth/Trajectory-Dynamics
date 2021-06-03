@@ -1,0 +1,115 @@
+%____________readinginput.m_________________
+
+function [TIME,THR,MASS,theta1]=readingInput(filename,location)
+    
+    sat= xlsread(filename,location);
+    TIME = sat(:,2); 
+    THR = sat(:,3);
+    MASS = sat(:,1);
+    theta1= sat(:,4);
+
+end
+
+
+%__________________AeroData.m_________________
+
+% AeroData
+% Drag Coefficient
+function [mach_s1,aero_s1_cd]=AeroData()
+
+aerodata_s1 = [...
+    0.0  	0.21
+    0.4     0.22
+    0.8     0.23
+    0.9     0.28
+    1.0     0.30
+    1.1     0.29
+    1.2     0.28
+    1.5     0.27
+    2.0     0.26
+    3.0     0.255
+    4.0     0.24
+    5.0     0.23
+    6.0     0.22
+    10.0    0.22];
+
+mach_s1 = aerodata_s1(:,1);
+aero_s1_cd = aerodata_s1(:,2);
+
+end
+
+%________________ic.m____________________
+
+function [v,x,r,gam,alpha,v_dot,gam_dot,mach_no,gravity,alt_km] = ic()
+	v=1; 
+	x=0; 
+	r=50; 
+	gam=90*pi/180; 
+	alpha=0; 
+	v_dot=0; 
+	gam_dot=0;
+	mach_no=0;
+	gravity=0;
+	alt_km = r/1000;
+end
+
+%___________________veh_thrust.m_________________________
+
+function [thrust,mass] = veh_thrust(TIME,THR,MASS,run_time,amb_press,exitdia)
+%vehicle thrust and mass
+    vac_thrust = intpol(TIME,THR,run_time);
+    thrust = vac_thrust - amb_press * pi*exitdia^2/4;
+    if(thrust < 0)
+        thrust = 0;
+    end
+    mass = intpol(TIME,MASS,run_time);
+end
+
+%_______________gc.m___________________
+
+function [gh,gravity]= gc(r,gam,k,gravity)
+    R0 = 6378137.0;
+    GM = 3.986005E14;
+    G0 = GM/R0^2;
+    gh = G0 * (R0/(R0+r))^2;
+    g_dot = gh*sin(gam)*k;
+    gravity = gravity + g_dot;
+end
+
+%_________________ptmSolve.m______________
+
+function [acc,v,gam,r,x]=ptmSolve(thrust,alpha,drag,mass,gh,R0,v,r,gam,k,run_time,x)
+	% Point Mass Equations
+    acc = (thrust*cos(alpha)-drag)/mass;
+    
+    v = v + ((thrust*cos(alpha)-drag)/mass - gh * sin(gam))*k;
+    if(run_time > 0.5)
+        gam = gam + ((thrust/(mass*v))*sin(alpha) + (v/(R0+r)-gh/v)*cos(gam))*k;
+    else
+        gam = 90*pi/180;
+    end
+    r = r + (v*sin(gam))*k;
+    x = x + (v*cos(gam))*k;
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

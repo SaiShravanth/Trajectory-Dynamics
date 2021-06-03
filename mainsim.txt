@@ -1,0 +1,105 @@
+clc; close all; clear all;
+
+%%
+%Input Data Model
+filename1='C:\Users\hp\Desktop\DRDO\data.xlsx';
+location1= 'A1:D43';
+[TIME,THR,MASS,theta1]=readingInput(filename1,location1);
+
+%%
+% AeroData
+[mach_s1,aero_s1_cd]=AeroData();
+
+%%
+%Initialisations
+R0 = 6378137.0;
+dia = 1.0;
+area = pi*dia^2/4;
+exitdia = 0.600;
+
+%%
+% Trajectory Data Initializations
+k = 0.05;
+run_time = 0;
+
+%%
+% Simulation Initializations
+[v,x,r,gam,alpha,acc,gam_dot,mach_no,gravity,alt_km] = ic();
+
+%%
+% File Initializations
+fp1 = fopen('C:\Users\hp\Documents\MATLAB\main_output.dat','wt');
+
+%%
+%Simulation Run
+
+while(run_time <= 1000)
+    if (alt_km<0)
+        break;
+    end
+    run_time = run_time + k
+    theta = intpol(TIME,theta1,run_time)*(pi/180);
+    alpha = theta - gam;
+    
+    % Atmospheric Data    
+    [density,vel_sound,temp,amb_press] = atmos_model(r);
+    
+    % Aerodynamics
+    dc=intpol(mach_s1,aero_s1_cd,mach_no);
+        
+    % Vehicle Thrust
+    [thrust,mass] = veh_thrust(TIME,THR,MASS,run_time,amb_press,exitdia);
+    
+    % Drag Force
+    dyp = 0.5 * density * v^2 * area;
+    drag = dyp * dc;
+    
+    % Gravity Model
+    [gh,gravity]= gc(r,gam,k,gravity);
+    
+    % Point Mass Equations
+    [acc,v,gam,r,x]=ptmSolve(thrust,alpha,drag,mass,gh,R0,v,r,gam,k,run_time,x);
+    
+    mach_no = v/vel_sound;
+    alt_km = r/1000;
+    range = x/1000;
+    
+    fprintf(fp1,'%f %f %f %f %f %f %f %f \n',run_time,acc,v,alt_km,gam/(pi/180),range,mach_no,dyp);
+end
+
+fclose(fp1);
+
+%%
+%Results Plotting
+
+a = load ('main_output.dat');
+
+time = a(:,1);
+accx = a(:,2);
+vmag = a(:,3);
+alt = a(:,4);
+gamma = a(:,5);
+drange = a(:,6);
+mach = a(:,7);
+dyn = a(:,8);
+
+figure;
+plot(time,accx,'LineWidth',2);title('Acceleration Profile');xlabel('Time (sec)');ylabel('Acceleration (m/s^2)');grid;zoom;
+
+figure;
+plot(time,vmag,'LineWidth',2);title('Velocity Profile');xlabel('Time (sec)');ylabel('Velocity (m/s)');grid;zoom;
+
+figure;
+plot(time,alt,'LineWidth',2);title('Altitude Profile');xlabel('Time (sec)');ylabel('Altitude (km)');grid;zoom;
+
+figure;
+plot(time,mach,'LineWidth',2);title('Mach No.');xlabel('Time (sec)');grid;zoom;
+
+figure;
+plot(time,gamma,'LineWidth',2);title('Flight Path Angle');xlabel('Time (sec)');ylabel('deg');grid;zoom;
+
+figure;
+plot(time,drange,'LineWidth',2);title('Range');xlabel('Time (sec)');ylabel('Range(km)');grid;zoom;
+
+figure;
+plot(drange,alt,'LineWidth',2);title('Trajectory');xlabel('Range(km)');ylabel('Altitude (km)');grid;zoom;
